@@ -18,7 +18,7 @@ class RouteChoiceBase(nn.Module):
         with torch.no_grad():
             if init_beta is not None:
                 if use_LS_for_beta:
-                    init_beta = init_beta + [0]
+                    init_beta = init_beta + [0.0]
                 self.beta.weight.copy_(torch.FloatTensor(init_beta))
             if init_scale is not None:
                 self.scale.weight.copy_(torch.FloatTensor(init_scale))
@@ -32,6 +32,7 @@ class RouteChoiceBase(nn.Module):
                 nn.Linear(len(self.beta_LS), 1),
                 nn.ReLU()
             )
+            
         self.beta_feat_data = torch.FloatTensor(np.stack([f.data for f in [OL, LT, UT, TT]])).T
         self.OL = torch.FloatTensor(np.sum(OL, 0))
         self.TT = torch.FloatTensor(np.sum(TT, 0)/np.sum(TT!=0, 0))
@@ -59,7 +60,10 @@ class RouteChoiceBase(nn.Module):
         self.OL_indices_cuda = self.OL_indices[1:].to(device)
         self.device = self.OL.device
         if self._use_LS_for_beta:
-            self.beta_LS = self.beta_LS.to(device)
+            try:
+                self.beta_LS = self.beta_LS.to(device)
+            except:
+                pass
         super().to(device)
 
     def forward_obs(self):
@@ -73,8 +77,8 @@ class RouteChoiceBase(nn.Module):
         mu = torch.exp(self.scale(mu_feat_data).squeeze(-1))
         torch.set_grad_enabled(True)
         if self._use_LS_for_beta:
-            if self.use_LS and self.use_LS_for_beta:
-                LS = LS[0, self.OL_indices[1]].unsqueeze(-1)
+            if self.use_LS_for_beta:
+                LS = self.beta_ls_decoder(self.beta_LS.T)
             else:
                 LS = torch.zeros((self.OL_indices[1].shape[0], 1), device=self.device)
             beta_feat_data = torch.cat((self.beta_feat_data, LS), -1)
@@ -89,18 +93,22 @@ class RouteChoiceBase(nn.Module):
         return ireward_smat_no_dummy, mu, mu_cpu, V, M_T, Z.T
     
     def nll_func_jacobian(self, beta_scale):
-        beta = beta_scale[None,:4]
-        scale = beta_scale[None, 4:]
+        pos = 5 if self.use_LS_for_beta else 4
+        beta = beta_scale[None,:pos]
+        scale = beta_scale[None, pos:]
         scale = F.pad(scale, [0, 3-scale.shape[1]])
         with torch.no_grad():
+            beta_feat_data = self.beta_feat_data
+            LS = torch.zeros_like(self.TT)
             if self.use_LS:
                 LS = self.ls_decoder(self.LS).T
-            else:
-                LS = torch.zeros_like(self.TT)
+                if self.use_LS_for_beta:
+                    LS_beta = self.beta_ls_decoder(self.beta_LS.T)
+                    beta_feat_data = torch.cat((self.beta_feat_data, LS_beta), -1)
             mu_feat_data = torch.stack([self.OL, self.TT, LS]).squeeze(1)
             mu_feat_data = F.pad(mu_feat_data, [0, 1], value=1).T
         mu = torch.exp(mu_feat_data @ scale.T)
-        ireward_data = self.beta_feat_data @ beta.T
+        ireward_data = beta_feat_data @ beta.T
         mu = mu.squeeze(-1)
         ireward_data = ireward_data.squeeze(-1)
         M, M_T = form_sparse_M(self.OL_indices, ireward_data, mu, self.nlink)
@@ -115,18 +123,22 @@ class RouteChoiceBase(nn.Module):
         return obs_nll
 
     def nll_func_hessian(self, beta_scale):
-        beta = beta_scale[None,:4]
-        scale = beta_scale[None, 4:]
+        pos = 5 if self.use_LS_for_beta else 4
+        beta = beta_scale[None,:pos]
+        scale = beta_scale[None, pos:]
         scale = F.pad(scale, [0, 3-scale.shape[1]])
         with torch.no_grad():
+            beta_feat_data = self.beta_feat_data
+            LS = torch.zeros_like(self.TT)
             if self.use_LS:
-                LS = self.ls_decoder(self.LS.cuda()).cpu().T
-            else:
-                LS = torch.zeros_like(self.TT)
+                LS = self.ls_decoder(self.LS).T
+                if self.use_LS_for_beta:
+                    LS_beta = self.beta_ls_decoder(self.beta_LS.T)
+                    beta_feat_data = torch.cat((self.beta_feat_data, LS_beta), -1)
             mu_feat_data = torch.stack([self.OL, self.TT, LS]).squeeze(1)
             mu_feat_data = F.pad(mu_feat_data, [0, 1], value=1).T
         mu = torch.exp(mu_feat_data @ scale.T)
-        ireward_data = self.beta_feat_data @ beta.T
+        ireward_data = beta_feat_data @ beta.T
         mu = mu.squeeze(-1)
         ireward_data = ireward_data.squeeze(-1)
         M = form_M(self.OL_indices, ireward_data, mu, self.nlink)

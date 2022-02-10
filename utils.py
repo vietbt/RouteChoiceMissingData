@@ -82,7 +82,7 @@ def load_link_size_data(link_size_folder, nlink):
 @memory.cache(ignore=['LS', 'OL_indices'])
 def load_beta_ls(LS, OL_indices, nlink):
     beta_LS = []
-    for ls in tqdm(LS):
+    for ls in tqdm(LS, "load_beta_ls"):
         ls = scipy_sparse_to_tensor(ls, [nlink, nlink]).to_dense()
         ls = ls[OL_indices[1], OL_indices[2]]
         beta_LS.append(ls)
@@ -235,11 +235,11 @@ def compute_all_Q(M, Z):
     d = torch.ones(M._nnz(), device=M.device, dtype=Z.dtype)
     d = d * Z[:, i[1, :]]
     d = d / Z[:, i[2, :]]
-    all_Q = [compute_Q(M, i, db) for db in tqdm(d, leave=False, desc='compute_Q')]
+    all_Q = [compute_Q(M, i, db) for db in tqdm(d, 'compute_Q', leave=False)]
     return all_Q
 
 def compute_all_P(I, all_Q, all_D):
-    missing_P_transposes = [compute_P(I, Q, D) for Q, D in tqdm(zip(all_Q, all_D), leave=False, desc='compute_P')]
+    missing_P_transposes = [compute_P(I, Q, D) for Q, D in tqdm(zip(all_Q, all_D), 'compute_P', leave=False)]
     return missing_P_transposes
 
 def get_log_path(logdir, method, seed, missing_prob, train_mu, use_LS, use_LS_for_beta):

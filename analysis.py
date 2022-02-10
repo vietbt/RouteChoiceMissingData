@@ -17,36 +17,39 @@ def read_tensorboard(path):
     data = ea.Scalars('likelihood/best_nll')
     nll = data[-1].value
     train_time = data[-1].wall_time - data[0].wall_time
-    train_step_time = data[1].wall_time - data[0].wall_time
+    train_step_time = train_time / len(data)
     return nll, train_time, train_step_time
 
-def load_model(parts, model_pt):
+def load_model(parts, model_pt, logdir):
     method, seed, prob, mu, LS = parts[1:]
     seed = int(seed.split("_")[-1])
     prob = float(prob.split("_")[-1])
     mu = mu == 'with_mu'
-    LS = LS == 'with_LS'
-    trainer = Trainer(None, None, prob, method, LS, seed, train_mu=mu, device='cuda', evaluate=True)
+    use_LS_for_beta = LS == 'with_LS_beta'
+    LS = use_LS_for_beta or LS == 'with_LS'
+    trainer = Trainer(None, None, prob, method, LS, use_LS_for_beta, seed, train_mu=mu, device='cpu', evaluate=True, logdir=logdir)
     trainer.load_model(model_pt)
     trainer.model.use_LS = trainer.use_LS
     trainer.model.train_mu = trainer.train_mu
     return trainer
 
 if __name__=="__main__":
+    logdir = 'logs_5'
     k = 0
-    with open("log.txt", 'w') as f:
-        for dirpath, _, filenames in os.walk('logs'):
-            if "seed_0" not in dirpath:
-                continue
-            # if "with_LS" not in dirpath:
+    with open("log_6.txt", 'w') as f:
+        for dirpath, _, filenames in os.walk(logdir):
+            # if "seed_0" in dirpath:
+            #     continue
+            # if "with_LS_beta" not in dirpath:
             #     continue
             
             if len(filenames) > 0:
+                print("dirpath:", dirpath)
                 event_name = [file for file in filenames if file.startswith("events.out")][0]
                 model_pt = [file for file in filenames if file.startswith("model.pt")][0]
                 parts = os.path.normpath(dirpath).split(os.path.sep)
-                trainer = load_model(parts, model_pt)
-                print("dirpath:", dirpath)
+                trainer = load_model(parts, model_pt, logdir)
+                
 
                 if False:
                     t0 = time.time()
@@ -69,7 +72,7 @@ if __name__=="__main__":
                     beta_scale = beta_scale[0, :n]
 
                     J = []
-                    for obs in tqdm(trainer.all_dataset, leave=False):
+                    for obs in tqdm(trainer.all_dataset, "Computing Jacobian", leave=False):
                         data = DataLoader([obs], trainer.OL)
                         trainer.model.data = data
                         J_obs = jacobian(trainer.model.nll_func_jacobian, beta_scale).cpu().unsqueeze(0)

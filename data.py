@@ -98,14 +98,15 @@ class DataLoaderEM:
             all_obs_seq_data.append(obs_data)
             all_obs_seq_len.append(obs_len)
             all_missing_seg.extend(miss)
-        self.process_obs(all_obs_seq_data, all_obs_seq_len)
-        self.process_missing(all_missing_seg)
-        self.adjlist = get_adjlist(OL[:, :self.nlink])
+        self.full_starts = None
         self.max_depth = max_depth
         self.mark_visited = False
         self.use_shortest_path = False
-        self.full_starts = None
         self.seed = 0
+
+        self.process_obs(all_obs_seq_data, all_obs_seq_len)
+        self.process_missing(all_missing_seg)
+        self.adjlist = get_adjlist(OL[:, :self.nlink])
 
     def process_obs(self, all_obs_seq_data, all_obs_seq_len):
         observed_smat = get_csr_from_data_length(
@@ -129,12 +130,11 @@ class DataLoaderEM:
             self.observed_path_idx = 0
             self.full_path_probs = np.ones(self.n_observed_obs)
             self.link_probs = np.ones(len(self.full_links))
-            return
-
-        missing_mat = np.stack(all_missing_seg).astype(int)
-        self.missing_seg_1based_mat = missing_mat
-        self.n_missing_segs = missing_mat.shape[0]
-        self.missing_dummies = missing_mat[:,0] - 1
+        else:
+            missing_mat = np.stack(all_missing_seg).astype(int)
+            self.missing_seg_1based_mat = missing_mat
+            self.n_missing_segs = missing_mat.shape[0]
+            self.missing_dummies = missing_mat[:,0] - 1
     
     def resample_path_for_missing_segments(self):
         self.is_able_to_connect_missing_segs = np.ones(self.n_missing_segs).astype(int)
@@ -166,7 +166,7 @@ class DataLoaderEM:
         n_sample_paths = []
         path_lens = []
         all_shortest_path_only = []
-        with Pool(16) as p:
+        with Pool(24) as p:
             func = partial(generate_samples_for_missing_data_subset, adjlist=self.adjlist, max_depth=self.max_depth, mark_visited=self.mark_visited, seed=self.seed)
             self.seed += 1
             for path_arr, shortest_path_only, path_len in p.map(func, missing_seg_1based_mat):
@@ -200,7 +200,7 @@ class DataLoaderEM:
                 self.is_able_to_connect_missing_segs[i],
                 self.sample_path_lens[s:e]))
         
-        with Pool(16) as p:
+        with Pool(24) as p:
             for path_probs in p.starmap(compute_probs_from_seq_1based_smat, path_prob_args):
                 all_sample_missing_paths_probs.append(path_probs)
 

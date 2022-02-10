@@ -17,9 +17,9 @@ if __name__ == "__main__":
     init_scale = [0.0, 0.0, 0.0]
 
     trainer = Trainer(init_beta, init_scale, args.prob, args.method, args.use_LS, args.use_LS_for_beta, args.seed, train_mu=args.train_mu, device='cuda', logdir=args.logdir)
-    if args.prob >= 0.5:
-        trainer.train(use_missing=False, use_LS=False, optim='lbfgs')
-    trainer.train(use_missing=False, use_LS_for_beta=False, optim='lbfgs2')
-    trainer.train(use_missing=False, use_LS_for_beta=False, optim='lbfgs3')
+    if args.prob >= 0.5 or args.use_LS_for_beta:
+        trainer.train(use_missing=False, use_LS=False, use_LS_for_beta=args.prob<0.7, optim='lbfgs')
+    trainer.train(use_missing=False, use_LS_for_beta=True, optim='lbfgs2')
+    trainer.train(use_missing=False, use_LS_for_beta=True, optim='lbfgs3')
     trainer.train(use_missing=True, optim='lbfgs4')
 

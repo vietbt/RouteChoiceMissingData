@@ -25,7 +25,8 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-logs/
+log*
+graph*
 *.txt
 demo.py
 hessian.py

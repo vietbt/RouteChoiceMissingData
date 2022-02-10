@@ -70,10 +70,11 @@ class RouteChoiceEM(RouteChoiceBase):
         
     def init_data(self, data: DataLoaderEM):
         data.seed = self.seed
-        _, _, _, _, M_T, Z_T = self.forward_obs()
-        all_Q = compute_all_Q(M_T, Z_T)
-        data.resample_path_for_missing_segments()
-        data.reload_path_probs(all_Q)
+        if data.n_missing_segs > 0:
+            _, _, _, _, M_T, Z_T = self.forward_obs()
+            all_Q = compute_all_Q(M_T, Z_T)
+            data.resample_path_for_missing_segments()
+            data.reload_path_probs(all_Q)
         self.data = data
 
     def forward(self, use_missing=False):

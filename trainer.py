@@ -36,6 +36,7 @@ class Trainer:
         self.device = device
         self.best_score = None
         self.step = 0
+        self.missing_prob = missing_prob
         
         self.logdir = get_log_path(logdir, method, seed, missing_prob, train_mu, use_LS, use_LS_for_beta)
         if not evaluate:
@@ -70,6 +71,7 @@ class Trainer:
     
     def load_model(self, file_name="model.pt"):
         path = os.path.join(self.logdir, file_name)
+        x = torch.load(path)
         self.model.load_state_dict(torch.load(path))
     
     def train(self, train_mu=None, use_LS=None, use_LS_for_beta=None, use_missing=False, max_steps=1, max_early_stop_steps=8, optim='lbfgs'):
@@ -79,11 +81,13 @@ class Trainer:
         self.writer.add_text('nll', str(locals()), self.step)
         # start_step = self.step if optim=='lbfgs3' else 0
         
+        
         self.best_score = None
         self.early_stop_steps = 0
 
         if not use_missing:
             self.model.init_data(self.data)
+        
         
         optimizer = getattr(self, optim)
         
@@ -113,16 +117,12 @@ class Trainer:
                 else:
                     loss.backward()
                     scaled_loss = loss
-
                 
                 beta = self.model.beta.weight.detach().cpu().numpy()[0]
                 scale = self.model.scale.weight.detach().cpu().numpy()[0]
                 lr = optimizer.param_groups[0]["lr"]
                 beta_str = f"{self.step}: LL = {-loss.item():.6f} @ beta = {beta} & scale = {scale} & lr = {lr:.6f}"
                 nll = self.evaluate()
-                # title = "_miss" if use_missing else "_no_miss"
-                # title += "_ls" if self.use_LS else "_no_ls"
-                # title += "_" + optim
 
                 nll_str = f"Step {self.step}: loss = {-loss.item():6f} & NLL = {nll:.6f}/{self.best_score:.6f} & lr = {lr:.6f}"
                 print(f"{nll_str} & stop = {self.early_stop_steps}/{max_early_stop_steps}")
