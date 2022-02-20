@@ -32,19 +32,31 @@ def load_log(file_name, keys=None):
             data[parts[1]].append(parts[3:])
     return data
 
-def plot(data, pos, ylabel, graph_name, deg=5):
+def plot(init_data, data, pos, ylabel, graph_name, deg=5):
     colors = iter(['#4c72b0', '#dd8453', '#55a868', '#c44f51', '#41e1b9', '#4169e1', '#e1b941', '#e14169', '#b9e141', '#6941e1'])
     markers = iter(['o', 's', 'P', 'X'])
-    plt.figure(figsize=(8, 6))
-    ax = plt.axes()
+
+    fig, ax = plt.subplots(figsize=(8, 6))
     ax.set_facecolor('#eaeaf2')
     plt.grid(color='w', linestyle=':')
+
+    if init_data is not None:
+        init_value = init_data[pos]
+        plt.plot((0.1, 0.9), (init_value, init_value), linewidth=3, color=next(colors), label=algos["init"])
+    else:
+        next(colors)
+
     for method, parts in data.items():
+        if method == "em8":
+            continue
         probs = [part[0] for part in parts]
         probs = sorted(set(probs))
         values = defaultdict(list)
         for part in parts:
-            values[part[0]].append(part[pos])
+            if init_data is None:
+                values[part[0]].append(part[pos])
+            else:
+                values[part[0]].append(min(part[pos], init_value))
         values = [values[prob] for prob in probs]
         uppers = [max(value) for value in values]
         lowers = [min(value) for value in values]
@@ -55,7 +67,6 @@ def plot(data, pos, ylabel, graph_name, deg=5):
         upper_model = np.poly1d(np.polyfit(probs, uppers, deg))
         lower_model = np.poly1d(np.polyfit(probs, lowers, deg))
 
-        # values = LowessSmoother(0.4, 1).smooth(values).smooth_data[0]
         values = value_model(probs)
 
         color = next(colors)
@@ -70,40 +81,69 @@ def plot(data, pos, ylabel, graph_name, deg=5):
         uppers = upper_model(probs)
         lowers = lower_model(probs)
 
-        # print("probs:", probs)
-        # print("uppers:", uppers)
-
-        # uppers = LowessSmoother(0.4, 1).smooth(uppers).smooth_data[0]
-        # lowers = LowessSmoother(0.4, 1).smooth(lowers).smooth_data[0]
-        
         plt.fill_between(probs, lowers, uppers, color=color, alpha=0.15, linewidth=0)
-    plt.legend(loc='best')
+    
+    legend = plt.legend(loc='best')
     plt.xlabel('Missing Probability')
-    plt.title(ylabel, pad=20)
-    plt.savefig(f"{graph_name}.pdf",  bbox_inches="tight")
+    plt.ylabel(ylabel)
+    legend.remove()
+
+    plt.savefig(f"graph_{graph_name}.pdf",  bbox_inches="tight")
+    export_legend(fig, ax, legend, f"graph_{graph_name}_legend.pdf")
     plt.cla()
+
+def export_legend(fig, ax, legend, legend_figpath):
+    fig.canvas.draw()
+    legend_bbox = legend.get_tightbbox(fig.canvas.get_renderer())
+    legend_bbox = legend_bbox.transformed(fig.dpi_scale_trans.inverted())
+    legend_fig, legend_ax = plt.subplots(figsize=(legend_bbox.width*1.2, legend_bbox.height))
+    legend_squared = legend_ax.legend(
+        *ax.get_legend_handles_labels(), 
+        bbox_to_anchor=(0, 0, 1, 1),
+        bbox_transform=legend_fig.transFigure,
+        frameon=False,
+        fancybox=None,
+        shadow=False,
+        mode='expand',
+    )
+    legend_ax.axis('off')
+    legend_fig.savefig(
+        legend_figpath,
+        bbox_inches='tight',
+        bbox_extra_artists=[legend_squared],
+    )
+
 
 if __name__ == "__main__":
     algos = {
-        'composition': 'Composition',
-        'em5': 'EM-BFS-5',
-        'em8': 'EM-BFS-8',
+        'init': 'Composition with No-Missing Dataset',
+        'composition': 'Composition with Missing Dataset',
+        'composition_no_miss': 'Connected Segments of Missing Dataset',
+        'em5': 'EM-BFS',
+        'em8': 'EM-BFS',
     }
 
-    data = load_log("log.txt")
-    plot(data, 6, 'Execution Time of Computing Log Likelihood (s)', 'graph_exec_time')
+    init_data = load_log("log_6.txt")
+    init_data = list(init_data.values())[0]
     
-    data = load_log("log_2.txt", ['without_mu', 'without_LS'])
-    plot(data, 4, 'Training Time (s)', 'graph_training_time', 3)
-
-    data = load_log("log_4.txt", ['with_mu', 'with_LS'])
-    plot(data, 3, 'Log Likelihood (mu + LS)', 'graph_nll_mu_ls')
-
-    data = load_log("log_4.txt", ['with_mu', 'without_LS'])
-    plot(data, 3, 'Log Likelihood (mu + w/o LS)', 'graph_nll_mu_without_ls')
+    data = load_log("log.txt")
+    plot(None, data, 6, 'Exec. Time of Computing LL (s)', 'exec_time')
+    
+    data = load_log("log_2.txt", ['without_LS'])
+    plot(None, data, 4, 'Training Time (s)', 'training_time', 3)
 
     data = load_log("log_4.txt", ['without_mu', 'without_LS'])
-    plot(data, 3, 'Log Likelihood (w/o mu + w/o LS)', 'graph_nll_without_mu_without_LS')
+    data.update(load_log("log_8.txt", ['without_mu', 'without_LS']))
+    plot(init_data[0], data, 3, 'Log Likelihood', 'nll_without_mu_without_LS')
 
-    data = load_log("log_5.txt", ['with_LS_beta'])
-    plot(data, 3, 'Log Likelihood (mu + LS beta)', 'graph_nll_mu_ls_beta')
+    data = load_log("log_4.txt", ['with_mu', 'without_LS'])
+    data.update(load_log("log_8.txt", ['with_mu', 'without_LS']))
+    plot(init_data[1], data, 3, 'Log Likelihood', 'nll_mu_without_ls')
+
+    data = load_log("log_4.txt", ['with_mu', 'with_LS'])
+    data.update(load_log("log_8.txt", ['with_mu', 'with_LS']))
+    plot(init_data[2], data, 3, 'Log Likelihood', 'nll_mu_ls')
+
+    data = load_log("log_7.txt", ['with_mu', 'with_LS_beta'])
+    data.update(load_log("log_9.txt", ['with_mu', 'with_LS_beta']))
+    plot(init_data[3], data, 3, 'Log Likelihood', 'nll_mu_ls_beta')
