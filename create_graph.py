@@ -2,7 +2,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
-from tsmoothie.smoother import LowessSmoother
+
 
 def read_str(s, mode=int):
     try:
@@ -123,27 +123,27 @@ if __name__ == "__main__":
         'em8': 'EM-BFS',
     }
 
-    init_data = load_log("log_6.txt")
+    init_data = load_log("log_no_missing.txt")
     init_data = list(init_data.values())[0]
     
-    data = load_log("log.txt")
+    data = load_log("log_exec_time.txt")
     plot(None, data, 6, 'Exec. Time of Computing LL (s)', 'exec_time')
     
-    data = load_log("log_2.txt", ['without_LS'])
+    data = load_log("log_training_time.txt", ['without_LS'])
     plot(None, data, 4, 'Training Time (s)', 'training_time', 3)
 
-    data = load_log("log_4.txt", ['without_mu', 'without_LS'])
-    data.update(load_log("log_8.txt", ['without_mu', 'without_LS']))
+    data = load_log("log_nll.txt", ['without_mu', 'without_LS'])
+    data.update(load_log("log_nll_maxent.txt", ['without_mu', 'without_LS']))
     plot(init_data[0], data, 3, 'Log Likelihood', 'nll_without_mu_without_LS')
 
-    data = load_log("log_4.txt", ['with_mu', 'without_LS'])
-    data.update(load_log("log_8.txt", ['with_mu', 'without_LS']))
+    data = load_log("log_nll.txt", ['with_mu', 'without_LS'])
+    data.update(load_log("log_nll_maxent.txt", ['with_mu', 'without_LS']))
     plot(init_data[1], data, 3, 'Log Likelihood', 'nll_mu_without_ls')
 
-    data = load_log("log_4.txt", ['with_mu', 'with_LS'])
-    data.update(load_log("log_8.txt", ['with_mu', 'with_LS']))
+    data = load_log("log_nll.txt", ['with_mu', 'with_LS'])
+    data.update(load_log("log_nll_maxent.txt", ['with_mu', 'with_LS']))
     plot(init_data[2], data, 3, 'Log Likelihood', 'nll_mu_ls')
 
-    data = load_log("log_7.txt", ['with_mu', 'with_LS_beta'])
-    data.update(load_log("log_9.txt", ['with_mu', 'with_LS_beta']))
+    data = load_log("log_nll_beta.txt", ['with_mu', 'with_LS_beta'])
+    data.update(load_log("log_nll_beta_maxent.txt", ['with_mu', 'with_LS_beta']))
     plot(init_data[3], data, 3, 'Log Likelihood', 'nll_mu_ls_beta')

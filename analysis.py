@@ -45,18 +45,16 @@ def load_model(parts, model_pt, logdir):
     return trainer
 
 if __name__=="__main__":
-    logdir = 'logs_6'
+    # Setting
+    logdir = None            # input
+    output_filename = None   # output
     use_missing = False
+    compute_exec_time = False
+    compute_std_error = False
+    
     k = 0
-    with open("log_9.txt", 'w') as f:
+    with open(output_filename, 'w') as f:
         for dirpath, _, filenames in os.walk(logdir):
-            # if "seed_0" not in dirpath:
-            #     continue
-            if "composition" not in dirpath:
-                continue
-            # if "with_LS_beta" not in dirpath:
-            #     continue
-            
             if len(filenames) > 0:
                 print("dirpath:", dirpath)
                 event_name = [file for file in filenames if file.startswith("events.out")][0]
@@ -64,8 +62,7 @@ if __name__=="__main__":
                 parts = os.path.normpath(dirpath).split(os.path.sep)
                 trainer = load_model(parts, model_pt, logdir)
                 
-
-                if False:
+                if compute_exec_time:
                     t0 = time.time()
                     trainer.model.init_data(trainer.data)
                     loss = trainer.model(use_missing=True)['loss']
@@ -76,7 +73,7 @@ if __name__=="__main__":
                 beta = trainer.model.beta.weight
                 scale = trainer.model.scale.weight
 
-                if False:
+                if compute_std_error:
                     n = beta.shape[-1]
                     if trainer.train_mu:
                         n += scale.shape[-1] - 1

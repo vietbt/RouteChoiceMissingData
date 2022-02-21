@@ -27,7 +27,6 @@ share/python-wheels/
 *.egg
 log*
 graph*
-*.txt
 demo.py
 hessian.py
 MANIFEST
