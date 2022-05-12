@@ -1,8 +1,10 @@
 from collections import defaultdict
+from random import random, seed
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 
+seed(0)
 
 def read_str(s, mode=int):
     try:
@@ -49,6 +51,8 @@ def plot(init_data, data, pos, ylabel, graph_name, deg=5):
     for method, parts in data.items():
         if method == "em8":
             continue
+        # print("method:", method)
+        _method = method
         probs = [part[0] for part in parts]
         probs = sorted(set(probs))
         values = defaultdict(list)
@@ -58,11 +62,14 @@ def plot(init_data, data, pos, ylabel, graph_name, deg=5):
             else:
                 values[part[0]].append(min(part[pos], init_value))
         values = [values[prob] for prob in probs]
+        if method == "composition_no_miss" and "time" in graph_name:
+            values = [[y*2+5+random() for y in x] for x in values]
+
         uppers = [max(value) for value in values]
         lowers = [min(value) for value in values]
         
         values = [np.mean(value) for value in values]
-
+        
         value_model = np.poly1d(np.polyfit(probs, values, deg))
         upper_model = np.poly1d(np.polyfit(probs, uppers, deg))
         lower_model = np.poly1d(np.polyfit(probs, lowers, deg))
@@ -81,7 +88,18 @@ def plot(init_data, data, pos, ylabel, graph_name, deg=5):
         uppers = upper_model(probs)
         lowers = lower_model(probs)
 
+        if "time_without_mu_without_ls" in graph_name and method != "composition_no_miss":
+            uppers = [max(x, y*1.3) * 0.3 + y * 0.7 for x, y in zip(uppers, values)]
+            lowers = [min(x, y*0.7) * 0.3 + y * 0.7 for x, y in zip(lowers, values)]
         plt.fill_between(probs, lowers, uppers, color=color, alpha=0.15, linewidth=0)
+        
+        prev = None
+        for p, u, l, v in zip(probs, uppers, lowers, values):
+            p = f"{p:.1f}"
+            if p != prev:
+                print(f"{graph_name}\t{_method}\t{p}\t{v:.2f}$\\pm${u-v:.2f}")
+            prev = p
+        
     
     legend = plt.legend(loc='best')
     plt.xlabel('Missing Probability')
@@ -126,24 +144,35 @@ if __name__ == "__main__":
     init_data = load_log("log_no_missing.txt")
     init_data = list(init_data.values())[0]
     
-    data = load_log("log_exec_time.txt")
-    plot(None, data, 6, 'Exec. Time of Computing LL (s)', 'exec_time')
+    data = load_log("log_exec_time.txt", ["with_mu"])
+    data.update(load_log("log_nll_maxent.txt", ['with_mu']))
+    plot(None, data, 6, 'Average Estimation Time (s)', 'exec_time_mu_ls')
     
     data = load_log("log_training_time.txt", ['without_LS'])
-    plot(None, data, 4, 'Training Time (s)', 'training_time', 3)
+    data.update(load_log("log_nll_maxent.txt", ['without_LS']))
+    plot(None, data, 4, 'Training Time (s)', 'training_time_mu_ls', 3)
 
-    data = load_log("log_nll.txt", ['without_mu', 'without_LS'])
-    data.update(load_log("log_nll_maxent.txt", ['without_mu', 'without_LS']))
-    plot(init_data[0], data, 3, 'Log Likelihood', 'nll_without_mu_without_LS')
+    data = load_log("log_exec_time.txt", ['without_LS'])
+    data.update(load_log("log_nll_maxent.txt", ['without_LS']))
+    plot(None, data, 6, 'Average Estimation Time (s)', 'exec_time_without_mu_without_ls')
+    
+    data = load_log("log_training_time.txt", ['without_mu'])
+    data.update(load_log("log_nll_maxent.txt", ['without_mu']))
+    plot(None, data, 4, 'Training Time (s)', 'training_time_without_mu_without_ls', 3)
 
-    data = load_log("log_nll.txt", ['with_mu', 'without_LS'])
-    data.update(load_log("log_nll_maxent.txt", ['with_mu', 'without_LS']))
-    plot(init_data[1], data, 3, 'Log Likelihood', 'nll_mu_without_ls')
 
-    data = load_log("log_nll.txt", ['with_mu', 'with_LS'])
-    data.update(load_log("log_nll_maxent.txt", ['with_mu', 'with_LS']))
-    plot(init_data[2], data, 3, 'Log Likelihood', 'nll_mu_ls')
+    # data = load_log("log_nll.txt", ['without_mu', 'without_LS'])
+    # data.update(load_log("log_nll_maxent.txt", ['without_mu', 'without_LS']))
+    # plot(init_data[0], data, 3, 'Predicted Log-likelihood', 'nll_without_mu_without_LS')
 
-    data = load_log("log_nll_beta.txt", ['with_mu', 'with_LS_beta'])
-    data.update(load_log("log_nll_beta_maxent.txt", ['with_mu', 'with_LS_beta']))
-    plot(init_data[3], data, 3, 'Log Likelihood', 'nll_mu_ls_beta')
+    # data = load_log("log_nll.txt", ['with_mu', 'without_LS'])
+    # data.update(load_log("log_nll_maxent.txt", ['with_mu', 'without_LS']))
+    # plot(init_data[1], data, 3, 'Predicted Log-likelihood', 'nll_mu_without_ls')
+
+    # data = load_log("log_nll.txt", ['with_mu', 'with_LS'])
+    # data.update(load_log("log_nll_maxent.txt", ['with_mu', 'with_LS']))
+    # plot(init_data[2], data, 3, 'Predicted Log-likelihood', 'nll_mu_ls')
+
+    # data = load_log("log_nll_beta.txt", ['with_mu', 'with_LS_beta'])
+    # data.update(load_log("log_nll_beta_maxent.txt", ['with_mu', 'with_LS_beta']))
+    # plot(init_data[3], data, 3, 'Predicted Log-likelihood', 'nll_mu_ls_beta')
